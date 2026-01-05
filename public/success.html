@@ -11,6 +11,7 @@
     const message = urlParams.get('message');
     
     // Intentar abrir la app
+    // Preparando para el despliegue
     setTimeout(() => {
       const deepLink = `petadopt://auth/success${message ? '?message=' + message : ''}`;
       window.location.href = deepLink;
