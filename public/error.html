@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Error - PetAdopt</title>
+  <link rel="stylesheet" href="/styles/auth.css">
+</head>
+<body>
+  <div class="container">
+    <div class="error-icon">✕</div>
+    <h1>¡Ups! Algo salió mal</h1>
+    <p id="errorMessage">Ha ocurrido un error inesperado</p>
+    
+    <a href="petadopt://auth/error" class="button">Volver a la App</a>
+    
+    <p class="subtitle">
+      Si el problema persiste, contacta a soporte
+    </p>
+  </div>
+
+  <script>
+    // Obtener mensaje de error de la URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const message = urlParams.get('message');
+    
+    if (message) {
+      document.getElementById('errorMessage').textContent = decodeURIComponent(message);
+    }
+  </script>
+</body>
+</html>

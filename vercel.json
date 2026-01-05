@@ -1,0 +1,43 @@
+{
+  "version": 2,
+  "name": "petadopt-vercel",
+  "rewrites": [
+    {
+      "source": "/auth/confirm",
+      "destination": "/api/confirm-email"
+    },
+    {
+      "source": "/auth/reset",
+      "destination": "/api/reset-password"
+    },
+    {
+      "source": "/auth/callback",
+      "destination": "/api/auth-callback"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        }
+      ]
+    }
+  ],
+  "env": {
+    "SUPABASE_URL": "@supabase_url",
+    "SUPABASE_ANON_KEY": "@supabase_anon_key",
+    "REDIRECT_URL_SUCCESS": "@redirect_url_success",
+    "REDIRECT_URL_ERROR": "@redirect_url_error"
+  }
+}

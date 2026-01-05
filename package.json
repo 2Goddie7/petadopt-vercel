@@ -1,0 +1,24 @@
+{
+  "name": "petadopt-auth-pages",
+  "version": "1.0.0",
+  "description": "PetAdopt authentication pages for Vercel",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "keywords": [
+    "petadopt",
+    "auth",
+    "vercel",
+    "supabase"
+  ],
+  "author": "PetAdopt Team",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0"
+  },
+  "devDependencies": {
+    "vercel": "^33.0.0"
+  }
+}

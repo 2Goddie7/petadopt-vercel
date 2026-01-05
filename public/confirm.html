@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Email Confirmado - PetAdopt</title>
+  <link rel="stylesheet" href="/styles/auth.css">
+  <script>
+    // Intentar abrir la app después de 2 segundos
+    setTimeout(() => {
+      window.location.href = 'petadopt://auth/success';
+    }, 2000);
+    
+    // Mostrar fallback después de 5 segundos si no se abrió la app
+    setTimeout(() => {
+      document.getElementById('fallback').style.display = 'block';
+    }, 5000);
+  </script>
+</head>
+<body>
+  <div class="container">
+    <div class="success-icon">✓</div>
+    <h1>¡Email Confirmado!</h1>
+    <p>Tu cuenta ha sido verificada exitosamente.</p>
+    <p class="subtitle">Redirigiendo a PetAdopt...</p>
+    
+    <div id="fallback" style="display: none;">
+      <p>Si la app no se abre automáticamente:</p>
+      <a href="petadopt://auth/success" class="button">Abrir PetAdopt</a>
+      
+      <p class="subtitle" style="margin-top: 20px;">
+        Si tienes problemas, intenta cerrar y abrir la app manualmente.
+      </p>
+    </div>
+  </div>
+</body>
+</html>

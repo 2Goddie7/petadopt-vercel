@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Restablecer Contraseña - PetAdopt</title>
+  <link rel="stylesheet" href="/styles/auth.css">
+</head>
+<body>
+  <div class="container">
+    <div class="logo">🐾</div>
+    <h1>Restablecer Contraseña</h1>
+    <p>Ingresa tu nueva contraseña para tu cuenta de PetAdopt</p>
+    
+    <form id="resetForm">
+      <div class="form-group">
+        <label for="password">Nueva Contraseña</label>
+        <input 
+          type="password" 
+          id="password" 
+          name="password" 
+          required 
+          minlength="6"
+          placeholder="Mínimo 6 caracteres"
+          autocomplete="new-password"
+        >
+        <small style="color: #6b7280; font-size: 12px; margin-top: 4px; display: block;">
+          Debe tener al menos 6 caracteres
+        </small>
+      </div>
+      
+      <div class="form-group">
+        <label for="confirmPassword">Confirmar Contraseña</label>
+        <input 
+          type="password" 
+          id="confirmPassword" 
+          name="confirmPassword" 
+          required 
+          minlength="6"
+          placeholder="Repite la contraseña"
+          autocomplete="new-password"
+        >
+      </div>
+      
+      <button type="submit" class="button" id="submitBtn">
+        Actualizar Contraseña
+      </button>
+      
+      <div id="message" class="message" style="display: none;"></div>
+    </form>
+  </div>
+
+  <script>
+    const form = document.getElementById('resetForm');
+    const message = document.getElementById('message');
+    const submitBtn = document.getElementById('submitBtn');
+    const passwordInput = document.getElementById('password');
+    const confirmPasswordInput = document.getElementById('confirmPassword');
+
+    // Obtener tokens de la URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const access_token = urlParams.get('access_token');
+    const refresh_token = urlParams.get('refresh_token');
+    const token = urlParams.get('token');
+
+    // Verificar que tengamos tokens
+    if (!access_token && !token) {
+      showMessage('Token inválido o expirado. Por favor, solicita un nuevo enlace.', 'error');
+      submitBtn.disabled = true;
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const password = passwordInput.value;
+      const confirmPassword = confirmPasswordInput.value;
+      
+      // Limpiar mensaje anterior
+      message.style.display = 'none';
+      
+      // Validar que las contraseñas coincidan
+      if (password !== confirmPassword) {
+        showMessage('Las contraseñas no coinciden', 'error');
+        return;
+      }
+      
+      // Validar longitud mínima
+      if (password.length < 6) {
+        showMessage('La contraseña debe tener al menos 6 caracteres', 'error');
+        return;
+      }
+      
+      // Validar que tenga algo de complejidad
+      if (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
+        showMessage('La contraseña debe contener letras y números', 'error');
+        return;
+      }
+      
+      // Deshabilitar botón y mostrar loading
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Actualizando...';
+      
+      try {
+        // Enviar solicitud al backend
+        const response = await fetch(window.location.pathname + window.location.search, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            password,
+            access_token,
+            refresh_token,
+            token
+          }),
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+          showMessage('✓ Contraseña actualizada correctamente. Redirigiendo...', 'success');
+          
+          // Redirigir a la app después de 2 segundos
+          setTimeout(() => {
+            window.location.href = 'petadopt://auth/success?message=password_updated';
+          }, 2000);
+          
+          // Mostrar fallback después de 5 segundos
+          setTimeout(() => {
+            const fallbackLink = document.createElement('a');
+            fallbackLink.href = 'petadopt://auth/success?message=password_updated';
+            fallbackLink.className = 'button';
+            fallbackLink.textContent = 'Abrir PetAdopt';
+            fallbackLink.style.marginTop = '16px';
+            message.parentNode.insertBefore(fallbackLink, message.nextSibling);
+          }, 5000);
+          
+        } else {
+          throw new Error(data.error || 'Error al actualizar contraseña');
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        showMessage(error.message || 'Error al actualizar la contraseña. Intenta nuevamente.', 'error');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Actualizar Contraseña';
+      }
+    });
+
+    function showMessage(text, type) {
+      message.textContent = text;
+      message.className = `message ${type}`;
+      message.style.display = 'block';
+    }
+
+    // Validación en tiempo real de coincidencia de contraseñas
+    confirmPasswordInput.addEventListener('input', () => {
+      if (confirmPasswordInput.value && passwordInput.value !== confirmPasswordInput.value) {
+        confirmPasswordInput.setCustomValidity('Las contraseñas no coinciden');
+      } else {
+        confirmPasswordInput.setCustomValidity('');
+      }
+    });
+  </script>
+</body>
+</html>

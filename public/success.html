@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>¡Éxito! - PetAdopt</title>
+  <link rel="stylesheet" href="/styles/auth.css">
+  <script>
+    // Obtener mensaje de la URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const message = urlParams.get('message');
+    
+    // Intentar abrir la app
+    setTimeout(() => {
+      const deepLink = `petadopt://auth/success${message ? '?message=' + message : ''}`;
+      window.location.href = deepLink;
+    }, 2000);
+    
+    // Mostrar fallback
+    setTimeout(() => {
+      document.getElementById('fallback').style.display = 'block';
+    }, 5000);
+    
+    // Actualizar mensaje si viene en la URL
+    window.addEventListener('DOMContentLoaded', () => {
+      if (message) {
+        const messageElement = document.getElementById('customMessage');
+        let customText = '';
+        
+        switch(message) {
+          case 'email_confirmed':
+            customText = 'Tu email ha sido confirmado exitosamente.';
+            break;
+          case 'password_updated':
+            customText = 'Tu contraseña ha sido actualizada.';
+            break;
+          case 'magic_link':
+            customText = 'Sesión iniciada correctamente.';
+            break;
+          default:
+            customText = 'Operación completada exitosamente.';
+        }
+        
+        messageElement.textContent = customText;
+      }
+    });
+  </script>
+</head>
+<body>
+  <div class="container">
+    <div class="success-icon">✓</div>
+    <h1>¡Operación Exitosa!</h1>
+    <p id="customMessage">Tu operación se ha completado correctamente.</p>
+    <p class="subtitle">Redirigiendo a PetAdopt...</p>
+    
+    <div class="spinner"></div>
+    
+    <div id="fallback" style="display: none;">
+      <p style="margin-top: 24px;">Si la app no se abre automáticamente:</p>
+      <a href="petadopt://auth/success" class="button">Abrir PetAdopt</a>
+      
+      <p class="subtitle" style="margin-top: 20px; color: #6b7280;">
+        Si sigues teniendo problemas, intenta:<br>
+        • Cerrar completamente la app y volver a abrirla<br>
+        • Verificar que tienes la última versión instalada
+      </p>
+    </div>
+  </div>
+</body>
+</html>
