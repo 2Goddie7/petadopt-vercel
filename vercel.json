@@ -33,11 +33,5 @@
         }
       ]
     }
-  ],
-  "env": {
-    "SUPABASE_URL": "@supabase_url",
-    "SUPABASE_ANON_KEY": "@supabase_anon_key",
-    "REDIRECT_URL_SUCCESS": "@redirect_url_success",
-    "REDIRECT_URL_ERROR": "@redirect_url_error"
-  }
+  ]
 }
