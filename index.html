@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PetAdopt - Auth Gateway</title>
+  <link rel="stylesheet" href="/styles/auth.css">
+  <script>
+    // Detectar si hay error en la URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    
+    const error = urlParams.get('error') || hashParams.get('error');
+    const errorDescription = urlParams.get('error_description') || hashParams.get('error_description');
+    
+    if (error) {
+      // Redirigir a página de error con el mensaje
+      const message = decodeURIComponent(errorDescription || error);
+      window.location.href = `/error.html?message=${encodeURIComponent(message)}`;
+    } else {
+      // Si no hay error, mostrar página de bienvenida con redirección a app
+      setTimeout(() => {
+        window.location.href = 'petadopt://auth/success';
+      }, 2000);
+      
+      setTimeout(() => {
+        document.getElementById('fallback').style.display = 'block';
+      }, 5000);
+    }
+  </script>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">🐾</div>
+    <h1>PetAdopt</h1>
+    <p>Conectando corazones con mascotas</p>
+    
+    <div class="spinner"></div>
+    <p class="subtitle">Redirigiendo a la app...</p>
+    
+    <div id="fallback" style="display: none;">
+      <p style="margin-top: 24px;">Si la app no se abre automáticamente:</p>
+      <a href="petadopt://auth/success" class="button">Abrir PetAdopt</a>
+      
+      <p class="subtitle" style="margin-top: 20px; color: #6b7280;">
+        Si sigues teniendo problemas:<br>
+        • Verifica que tengas la app instalada<br>
+        • Intenta cerrar y reabrir la app
+      </p>
+    </div>
+  </div>
+</body>
+</html>
