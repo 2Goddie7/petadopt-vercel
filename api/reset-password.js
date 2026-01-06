@@ -37,22 +37,35 @@ export default async function handler(req) {
         );
       }
 
-      // 🔑 Verificar el token y actualizar contraseña
-      const { data, error } = await supabase.auth.verifyOtp({
+      // 🔑 Verificar el token primero
+      const { data: userData, error: verifyError } = await supabase.auth.verifyOtp({
         token_hash: token,
         type: 'recovery',
       });
 
-      if (error) {
-        console.error('Error verificando token:', error);
+      if (verifyError) {
+        console.error('Error verificando token:', verifyError);
         return new Response(
-          JSON.stringify({ error: 'Token inválido o expirado' }),
+          JSON.stringify({ error: 'Token inválido o expirado. Solicita un nuevo enlace de recuperación.' }),
           { status: 400, headers: { 'Content-Type': 'application/json' } }
         );
       }
 
-      // Si la verificación fue exitosa, actualizar la contraseña
-      const { error: updateError } = await supabase.auth.updateUser({
+      // Si el token es válido, crear un cliente autenticado con la sesión
+      const authenticatedSupabase = createClient(
+        process.env.SUPABASE_URL,
+        process.env.SUPABASE_ANON_KEY,
+        {
+          global: {
+            headers: {
+              Authorization: `Bearer ${userData.session?.access_token}`
+            }
+          }
+        }
+      );
+
+      // Ahora actualizar la contraseña con el cliente autenticado
+      const { error: updateError } = await authenticatedSupabase.auth.updateUser({
         password: password
       });
 
