@@ -8,6 +8,7 @@ export default async function handler(req) {
   try {
     const url = new URL(req.url);
     const token = url.searchParams.get('token');
+    const type = url.searchParams.get('type');
 
     // ✅ Validar token
     if (!token) {
@@ -37,56 +38,91 @@ export default async function handler(req) {
         );
       }
 
-      // 🔑 Verificar el token primero
-      const { data: userData, error: verifyError } = await supabase.auth.verifyOtp({
-        token_hash: token,
-        type: 'recovery',
-      });
+      try {
+        // 🔑 NUEVO ENFOQUE: Intercambiar el token PKCE por una sesión
+        let session = null;
+        let verifyError = null;
 
-      if (verifyError) {
-        console.error('Error verificando token:', verifyError);
-        return new Response(
-          JSON.stringify({ error: 'Token inválido o expirado. Solicita un nuevo enlace de recuperación.' }),
-          { status: 400, headers: { 'Content-Type': 'application/json' } }
-        );
-      }
+        // Intentar con exchangeCodeForSession (para PKCE tokens)
+        if (token.startsWith('pkce_')) {
+          const { data, error } = await supabase.auth.exchangeCodeForSession(token);
+          session = data?.session;
+          verifyError = error;
+        } else {
+          // Si no es PKCE, usar verifyOtp
+          const { data, error } = await supabase.auth.verifyOtp({
+            token_hash: token,
+            type: type || 'recovery',
+          });
+          session = data?.session;
+          verifyError = error;
+        }
 
-      // Si el token es válido, crear un cliente autenticado con la sesión
-      const authenticatedSupabase = createClient(
-        process.env.SUPABASE_URL,
-        process.env.SUPABASE_ANON_KEY,
-        {
-          global: {
-            headers: {
-              Authorization: `Bearer ${userData.session?.access_token}`
+        if (verifyError || !session) {
+          console.error('Error verificando token:', verifyError);
+          return new Response(
+            JSON.stringify({ 
+              error: 'Token inválido o expirado. Solicita un nuevo enlace de recuperación.',
+              details: verifyError?.message 
+            }),
+            { status: 400, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // 🔑 Crear cliente autenticado con el access_token de la sesión
+        const authenticatedSupabase = createClient(
+          process.env.SUPABASE_URL,
+          process.env.SUPABASE_ANON_KEY,
+          {
+            global: {
+              headers: {
+                Authorization: `Bearer ${session.access_token}`
+              }
             }
           }
+        );
+
+        // 🔑 Actualizar la contraseña con el cliente autenticado
+        const { error: updateError } = await authenticatedSupabase.auth.updateUser({
+          password: password
+        });
+
+        if (updateError) {
+          console.error('Error actualizando contraseña:', updateError);
+          return new Response(
+            JSON.stringify({ 
+              error: 'No se pudo actualizar la contraseña',
+              details: updateError.message 
+            }),
+            { status: 400, headers: { 'Content-Type': 'application/json' } }
+          );
         }
-      );
 
-      // Ahora actualizar la contraseña con el cliente autenticado
-      const { error: updateError } = await authenticatedSupabase.auth.updateUser({
-        password: password
-      });
-
-      if (updateError) {
-        console.error('Error actualizando contraseña:', updateError);
         return new Response(
-          JSON.stringify({ error: updateError.message }),
-          { status: 400, headers: { 'Content-Type': 'application/json' } }
+          JSON.stringify({ 
+            success: true,
+            message: 'Contraseña actualizada correctamente'
+          }),
+          { 
+            status: 200, 
+            headers: { 'Content-Type': 'application/json' } 
+          }
+        );
+      } catch (error) {
+        console.error('Error en el proceso:', error);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Error del servidor al procesar la solicitud',
+            details: error.message
+          }),
+          { status: 500, headers: { 'Content-Type': 'application/json' } }
         );
       }
-
-      return new Response(
-        JSON.stringify({ success: true }),
-        { 
-          status: 200, 
-          headers: { 'Content-Type': 'application/json' } 
-        }
-      );
     }
 
-    // GET = mostrar formulario de reset (NO validar token aquí)
+    // GET = mostrar formulario de reset
+    const redirectUrl = process.env.REDIRECT_URL_SUCCESS || 'petadopt://auth/success';
+
     const resetFormHTML = `
 <!DOCTYPE html>
 <html lang="es">
@@ -147,7 +183,6 @@ export default async function handler(req) {
       const password = passwordInput.value;
       const confirmPassword = confirmPasswordInput.value;
 
-      // Validar que las contraseñas coincidan
       if (password !== confirmPassword) {
         showMessage('Las contraseñas no coinciden', 'error');
         return;
@@ -162,9 +197,6 @@ export default async function handler(req) {
       submitBtn.textContent = 'Actualizando...';
 
       try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const token = urlParams.get('token');
-
         const response = await fetch(window.location.href, {
           method: 'POST',
           headers: {
@@ -175,13 +207,16 @@ export default async function handler(req) {
 
         const data = await response.json();
 
-        if (response.ok) {
+        if (response.ok && data.success) {
           showMessage('¡Contraseña actualizada! Redirigiendo...', 'success');
           setTimeout(() => {
-            window.location.href = '/success.html?message=password_updated';
+            window.location.href = '${redirectUrl}?message=password_updated';
           }, 2000);
         } else {
           showMessage(data.error || 'Error al actualizar contraseña', 'error');
+          if (data.details) {
+            console.error('Detalles:', data.details);
+          }
           submitBtn.disabled = false;
           submitBtn.textContent = 'Actualizar Contraseña';
         }
@@ -195,11 +230,10 @@ export default async function handler(req) {
 
     function showMessage(text, type) {
       message.textContent = text;
-      message.className = \`message \${type}\`;
+      message.className = 'message ' + type;
       message.style.display = 'block';
     }
 
-    // Validación en tiempo real
     confirmPasswordInput.addEventListener('input', () => {
       if (confirmPasswordInput.value && passwordInput.value !== confirmPasswordInput.value) {
         confirmPasswordInput.setCustomValidity('Las contraseñas no coinciden');
