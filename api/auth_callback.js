@@ -11,8 +11,11 @@ export default async function handler(req) {
     const error = url.searchParams.get('error');
     const error_description = url.searchParams.get('error_description');
 
-    // Si hay error, redirigir a página de error
+    console.log('Auth callback iniciado:', { code: code?.substring(0, 20), error });
+
+    // Si hay error de Supabase, redirigir a página de error
     if (error) {
+      console.error('Error de autenticación:', error, error_description);
       return Response.redirect(
         `${url.origin}/error.html?message=${encodeURIComponent(error_description || error)}`
       );
@@ -20,6 +23,7 @@ export default async function handler(req) {
 
     // Si no hay code, algo salió mal
     if (!code) {
+      console.error('No se recibió código de autenticación');
       return Response.redirect(
         `${url.origin}/error.html?message=Código de autenticación no válido`
       );
@@ -41,6 +45,49 @@ export default async function handler(req) {
       );
     }
 
+    if (!data?.session?.access_token) {
+      console.error('No se obtuvo sesión válida');
+      return Response.redirect(
+        `${url.origin}/error.html?message=No se pudo establecer la sesión`
+      );
+    }
+
+    // Verificar que el usuario tenga perfil
+    const userId = data.session.user.id;
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, full_name, user_type')
+      .eq('id', userId)
+      .single();
+
+    if (profileError || !profile) {
+      console.warn('Usuario sin perfil, creando...', userId);
+      
+      // Intentar crear el perfil
+      const { error: createError } = await supabase
+        .from('profiles')
+        .insert({
+          id: userId,
+          email: data.session.user.email,
+          full_name: data.session.user.user_metadata?.full_name || 
+                     data.session.user.user_metadata?.name || 
+                     data.session.user.email?.split('@')[0] || 
+                     'Usuario',
+          user_type: 'adopter',
+          avatar_url: data.session.user.user_metadata?.avatar_url ||
+                      data.session.user.user_metadata?.picture
+        });
+
+      if (createError) {
+        console.error('Error creando perfil:', createError);
+        return Response.redirect(
+          `${url.origin}/error.html?message=Error creando perfil de usuario`
+        );
+      }
+
+      console.log('Perfil creado exitosamente');
+    }
+
     // Éxito - redirigir a la app
     const redirectUrl = process.env.REDIRECT_URL_SUCCESS || 'petadopt://auth/success';
     
@@ -53,8 +100,9 @@ export default async function handler(req) {
   <title>Autenticación Exitosa - PetAdopt</title>
   <link rel="stylesheet" href="/styles/auth.css">
   <script>
+    console.log('Redirigiendo a app con tokens...');
     setTimeout(() => {
-      window.location.href = '${redirectUrl}?access_token=${data.session?.access_token || ''}&refresh_token=${data.session?.refresh_token || ''}';
+      window.location.href = '${redirectUrl}?access_token=${data.session.access_token}&refresh_token=${data.session.refresh_token}';
     }, 1000);
     
     setTimeout(() => {
@@ -68,9 +116,13 @@ export default async function handler(req) {
     <h1>¡Autenticación Exitosa!</h1>
     <p>Redirigiendo a PetAdopt...</p>
     
+    <div class="spinner"></div>
+    
     <div id="fallback" style="display: none;">
       <p>Si no se abre automáticamente:</p>
-      <a href="${redirectUrl}" class="button">Abrir PetAdopt</a>
+      <a href="${redirectUrl}?access_token=${data.session.access_token}&refresh_token=${data.session.refresh_token}" class="button">
+        Abrir PetAdopt
+      </a>
     </div>
   </div>
 </body>
@@ -86,7 +138,7 @@ export default async function handler(req) {
   } catch (error) {
     console.error('Error en auth-callback:', error);
     return Response.redirect(
-      `${url.origin}/error.html?message=Error del servidor`
+      `${url.origin}/error.html?message=Error del servidor: ${error.message}`
     );
   }
 }
