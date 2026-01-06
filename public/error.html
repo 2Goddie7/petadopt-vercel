@@ -4,29 +4,43 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Error - PetAdopt</title>
-  <link rel="stylesheet" href="/public/styles/auth.css">
+  <link rel="stylesheet" href="/styles/auth.css">
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const message = urlParams.get('message');
+    
+    window.addEventListener('DOMContentLoaded', () => {
+      if (message) {
+        document.getElementById('errorMessage').textContent = decodeURIComponent(message);
+      }
+    });
+    
+    function retry() {
+      window.history.back();
+    }
+    
+    function openApp() {
+      window.location.href = 'petadopt://auth/error';
+    }
+  </script>
 </head>
 <body>
   <div class="container">
     <div class="error-icon">✕</div>
-    <h1>¡Ups! Algo salió mal</h1>
-    <p id="errorMessage">Ha ocurrido un error inesperado</p>
+    <h1>¡Algo salió mal!</h1>
+    <p id="errorMessage">Ha ocurrido un error durante la autenticación.</p>
     
-    <a href="petadopt://auth/error" class="button">Volver a la App</a>
+    <button onclick="retry()" class="button" style="margin-top: 24px;">
+      Intentar de Nuevo
+    </button>
     
-    <p class="subtitle">
-      Si el problema persiste, contacta a soporte
+    <button onclick="openApp()" class="button" style="margin-top: 12px; background: #6b7280;">
+      Volver a la App
+    </button>
+    
+    <p class="subtitle" style="margin-top: 24px;">
+      Si el problema persiste, contacta a soporte.
     </p>
   </div>
-
-  <script>
-    // Obtener mensaje de error de la URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const message = urlParams.get('message');
-    
-    if (message) {
-      document.getElementById('errorMessage').textContent = decodeURIComponent(message);
-    }
-  </script>
 </body>
 </html>

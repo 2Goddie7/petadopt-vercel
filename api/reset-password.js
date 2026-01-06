@@ -7,7 +7,7 @@ export const config = {
 export default async function handler(req) {
   try {
     const url = new URL(req.url);
-    const token = url.searchParams.get('token'); // Solo RecoveryToken
+    const token = url.searchParams.get('token');
 
     // ✅ Validar token
     if (!token) {
@@ -37,32 +37,44 @@ export default async function handler(req) {
         );
       }
 
-      // 🔑 Usar el token de recuperación para actualizar la contraseña
-      const { data, error } = await supabase.auth.updateUser(
-        { password },
-        { token } // importante: token = RecoveryToken
-      );
+      // 🔑 Verificar el token y actualizar contraseña
+      const { data, error } = await supabase.auth.verifyOtp({
+        token_hash: token,
+        type: 'recovery',
+      });
 
       if (error) {
+        console.error('Error verificando token:', error);
         return new Response(
-          JSON.stringify({ error: error.message }),
+          JSON.stringify({ error: 'Token inválido o expirado' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Si la verificación fue exitosa, actualizar la contraseña
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: password
+      });
+
+      if (updateError) {
+        console.error('Error actualizando contraseña:', updateError);
+        return new Response(
+          JSON.stringify({ error: updateError.message }),
           { status: 400, headers: { 'Content-Type': 'application/json' } }
         );
       }
 
       return new Response(
-        JSON.stringify({
-          success: true,
-          message: 'Contraseña actualizada correctamente'
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
+        JSON.stringify({ success: true }),
+        { 
+          status: 200, 
+          headers: { 'Content-Type': 'application/json' } 
+        }
       );
     }
 
-    // GET = mostrar formulario
-    const redirectUrl = process.env.REDIRECT_URL_SUCCESS || 'petadopt://auth/success';
-
-    const html = `
+    // GET = mostrar formulario de reset (NO validar token aquí)
+    const resetFormHTML = `
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -76,43 +88,60 @@ export default async function handler(req) {
     <div class="logo">🐾</div>
     <h1>Restablecer Contraseña</h1>
     <p>Ingresa tu nueva contraseña</p>
-    
-    <form id="resetForm">
+
+    <form id="resetForm" style="margin-top: 30px;">
       <div class="form-group">
         <label for="password">Nueva Contraseña</label>
-        <input type="password" id="password" name="password" required minlength="6" placeholder="Mínimo 6 caracteres">
+        <input
+          type="password"
+          id="password"
+          name="password"
+          required
+          minlength="6"
+          placeholder="Mínimo 6 caracteres"
+        >
       </div>
-      
+
       <div class="form-group">
         <label for="confirmPassword">Confirmar Contraseña</label>
-        <input type="password" id="confirmPassword" name="confirmPassword" required minlength="6" placeholder="Repite la contraseña">
+        <input
+          type="password"
+          id="confirmPassword"
+          name="confirmPassword"
+          required
+          placeholder="Repite tu contraseña"
+        >
       </div>
-      
-      <button type="submit" class="button" id="submitBtn">Actualizar Contraseña</button>
-      <div id="message" class="message"></div>
+
+      <button type="submit" class="button" id="submitBtn">
+        Actualizar Contraseña
+      </button>
+
+      <div id="message" class="message" style="display: none;"></div>
     </form>
   </div>
 
   <script>
     const form = document.getElementById('resetForm');
+    const passwordInput = document.getElementById('password');
+    const confirmPasswordInput = document.getElementById('confirmPassword');
     const message = document.getElementById('message');
     const submitBtn = document.getElementById('submitBtn');
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
 
-      const password = document.getElementById('password').value;
-      const confirmPassword = document.getElementById('confirmPassword').value;
+      const password = passwordInput.value;
+      const confirmPassword = confirmPasswordInput.value;
 
+      // Validar que las contraseñas coincidan
       if (password !== confirmPassword) {
-        message.className = 'message error';
-        message.textContent = 'Las contraseñas no coinciden';
+        showMessage('Las contraseñas no coinciden', 'error');
         return;
       }
 
       if (password.length < 6) {
-        message.className = 'message error';
-        message.textContent = 'La contraseña debe tener al menos 6 caracteres';
+        showMessage('La contraseña debe tener al menos 6 caracteres', 'error');
         return;
       }
 
@@ -121,28 +150,48 @@ export default async function handler(req) {
 
       try {
         const urlParams = new URLSearchParams(window.location.search);
-        const token = urlParams.get('token'); // Solo RecoveryToken
+        const token = urlParams.get('token');
 
-        const response = await fetch(window.location.pathname + window.location.search, {
+        const response = await fetch(window.location.href, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ password, token })
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ password }),
         });
 
         const data = await response.json();
 
-        if (data.success) {
-          message.className = 'message success';
-          message.textContent = '✓ Contraseña actualizada. Redirigiendo...';
-          setTimeout(() => { window.location.href = '${redirectUrl}'; }, 2000);
+        if (response.ok) {
+          showMessage('¡Contraseña actualizada! Redirigiendo...', 'success');
+          setTimeout(() => {
+            window.location.href = '/success.html?message=password_updated';
+          }, 2000);
         } else {
-          throw new Error(data.error || 'Error al actualizar contraseña');
+          showMessage(data.error || 'Error al actualizar contraseña', 'error');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Actualizar Contraseña';
         }
       } catch (error) {
-        message.className = 'message error';
-        message.textContent = error.message;
+        console.error('Error:', error);
+        showMessage('Error de conexión. Intenta nuevamente.', 'error');
         submitBtn.disabled = false;
         submitBtn.textContent = 'Actualizar Contraseña';
+      }
+    });
+
+    function showMessage(text, type) {
+      message.textContent = text;
+      message.className = \`message \${type}\`;
+      message.style.display = 'block';
+    }
+
+    // Validación en tiempo real
+    confirmPasswordInput.addEventListener('input', () => {
+      if (confirmPasswordInput.value && passwordInput.value !== confirmPasswordInput.value) {
+        confirmPasswordInput.setCustomValidity('Las contraseñas no coinciden');
+      } else {
+        confirmPasswordInput.setCustomValidity('');
       }
     });
   </script>
@@ -150,9 +199,16 @@ export default async function handler(req) {
 </html>
     `;
 
-    return new Response(html, { headers: { 'Content-Type': 'text/html' } });
+    return new Response(resetFormHTML, {
+      headers: {
+        'Content-Type': 'text/html',
+      },
+    });
+
   } catch (error) {
     console.error('Error en reset-password:', error);
-    return Response.redirect(`${req.url.origin}/error.html?message=Error del servidor`);
+    return Response.redirect(
+      `${url.origin}/error.html?message=Error del servidor`
+    );
   }
 }
