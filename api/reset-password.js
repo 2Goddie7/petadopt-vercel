@@ -39,51 +39,27 @@ export default async function handler(req) {
       }
 
       try {
-        // 🔑 NUEVO ENFOQUE: Intercambiar el token PKCE por una sesión
-        let session = null;
-        let verifyError = null;
+        // 🔑 NUEVA ESTRATEGIA: Usar verifyOtp directamente
+        // Los tokens PKCE NO funcionan para password recovery
+        const { data, error } = await supabase.auth.verifyOtp({
+          token_hash: token,
+          type: 'recovery',
+        });
 
-        // Intentar con exchangeCodeForSession (para PKCE tokens)
-        if (token.startsWith('pkce_')) {
-          const { data, error } = await supabase.auth.exchangeCodeForSession(token);
-          session = data?.session;
-          verifyError = error;
-        } else {
-          // Si no es PKCE, usar verifyOtp
-          const { data, error } = await supabase.auth.verifyOtp({
-            token_hash: token,
-            type: type || 'recovery',
-          });
-          session = data?.session;
-          verifyError = error;
-        }
-
-        if (verifyError || !session) {
-          console.error('Error verificando token:', verifyError);
+        if (error) {
+          console.error('Error verificando token:', error);
           return new Response(
             JSON.stringify({ 
               error: 'Token inválido o expirado. Solicita un nuevo enlace de recuperación.',
-              details: verifyError?.message 
+              details: error.message 
             }),
             { status: 400, headers: { 'Content-Type': 'application/json' } }
           );
         }
 
-        // 🔑 Crear cliente autenticado con el access_token de la sesión
-        const authenticatedSupabase = createClient(
-          process.env.SUPABASE_URL,
-          process.env.SUPABASE_ANON_KEY,
-          {
-            global: {
-              headers: {
-                Authorization: `Bearer ${session.access_token}`
-              }
-            }
-          }
-        );
-
-        // 🔑 Actualizar la contraseña con el cliente autenticado
-        const { error: updateError } = await authenticatedSupabase.auth.updateUser({
+        // Si llegamos aquí, el token es válido y tenemos una sesión
+        // Ahora actualizar la contraseña
+        const { error: updateError } = await supabase.auth.updateUser({
           password: password
         });
 
